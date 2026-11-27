@@ -3,16 +3,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Staff Attendance Management</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Staff Management System</title>
+
 <style>
 *{box-sizing:border-box}
 body{
+ margin:0;padding:20px;
  font-family:Arial,sans-serif;
- background:#f3f5f9;
- margin:0;padding:20px;color:#202b3c
+ background:#f2f5fa;color:#243247
 }
-.container{max-width:1100px;margin:auto}
+.container{max-width:1200px;margin:auto}
 header{
  background:#142b4a;color:white;
  padding:25px;border-radius:12px;
@@ -33,55 +34,72 @@ button{cursor:pointer;border:0;font-weight:bold}
 .primary{background:#1769d2;color:white}
 .success{background:#16834a;color:white}
 .danger{background:#d83b3b;color:white}
+.warning{background:#e9a126;color:white}
+.teal{background:#168b83;color:white}
 .export{background:#087b59;color:white}
-.controls{display:flex;gap:10px;flex-wrap:wrap}
-.controls input,.controls select{flex:1;min-width:150px}
+.controls{
+ display:flex;gap:10px;flex-wrap:wrap
+}
+.controls input,.controls select{flex:1;min-width:160px}
 .stats{
- display:grid;grid-template-columns:repeat(3,1fr);
+ display:grid;grid-template-columns:repeat(4,1fr);
  gap:12px;margin-bottom:20px
 }
-.stat{
- background:white;padding:18px;border-radius:10px
-}
+.stat{background:white;padding:18px;border-radius:10px}
 .stat h2{margin:8px 0;color:#1769d2}
-table{width:100%;border-collapse:collapse;min-width:750px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:950px}
 th,td{padding:13px;border-bottom:1px solid #eee;text-align:left}
 th{background:#edf2f8}
-.table-wrap{overflow-x:auto}
-@media(max-width:600px){
- .stats{grid-template-columns:1fr}
+.status{font-weight:bold;color:#16834a}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.small{font-size:12px;color:#64748b}
+@media(max-width:700px){
+ .stats{grid-template-columns:repeat(2,1fr)}
+ body{padding:10px}
 }
 </style>
 </head>
+
 <body>
 <div class="container">
 
 <header>
 <h1>STAFF MANAGEMENT</h1>
-<p>Staff Attendance & Working Hours Tracker</p>
-<div id="clock"></div>
+<p>Attendance | Lunch Break | Working Hours</p>
+<h3 id="clock"></h3>
 </header>
 
+<!-- ADD STAFF -->
 <div class="card">
-<h3>Add New Staff</h3>
+<h3>Staff Registration</h3>
 <div class="controls">
 <input id="staffName" placeholder="Enter Staff Name">
 <button class="primary" onclick="addStaff()">+ Add Staff</button>
 </div>
+<p class="small">Add your staff members before recording attendance.</p>
+<div id="staffList"></div>
 </div>
 
+<!-- ATTENDANCE -->
 <div class="card">
-<h3>Attendance Entry</h3>
+<h3>Attendance Control</h3>
+
 <div class="controls">
 <select id="staffSelect">
 <option value="">Select Staff Member</option>
 </select>
+
 <button class="success" onclick="checkIn()">CHECK IN</button>
+<button class="warning" onclick="breakStart()">LUNCH START</button>
+<button class="teal" onclick="breakEnd()">LUNCH END</button>
 <button class="danger" onclick="checkOut()">CHECK OUT</button>
 </div>
+
 <p id="message"></p>
 </div>
 
+<!-- DASHBOARD -->
 <div class="stats">
 <div class="stat">
 Total Staff
@@ -95,14 +113,22 @@ Present Today
 Currently Working
 <h2 id="workingNow">0</h2>
 </div>
+<div class="stat">
+On Lunch Break
+<h2 id="onLunch">0</h2>
+</div>
 </div>
 
+<!-- RECORDS -->
 <div class="card">
 <h3>Attendance Records</h3>
+
 <div class="controls" style="margin-bottom:15px">
 <input type="date" id="filterDate" onchange="render()">
-<button class="export" onclick="exportExcel()">Download Excel</button>
+<button class="export" onclick="exportExcel()">DOWNLOAD EXCEL</button>
+<button class="primary" onclick="clearFilter()">TODAY</button>
 </div>
+
 <div class="table-wrap">
 <table>
 <thead>
@@ -110,17 +136,24 @@ Currently Working
 <th>Staff Name</th>
 <th>Date</th>
 <th>Check In</th>
+<th>Lunch Start</th>
+<th>Lunch End</th>
 <th>Check Out</th>
-<th>Working Hours</th>
+<th>Lunch Duration</th>
+<th>Net Working Hours</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody id="records"></tbody>
 </table>
 </div>
 </div>
+
 </div>
 
 <script>
+
+// DATA STORAGE
 let staff=JSON.parse(localStorage.getItem("staff")||"[]");
 let logs=JSON.parse(localStorage.getItem("logs")||"[]");
 
@@ -133,138 +166,299 @@ function now(){
  return new Date();
 }
 
+function localDate(d=now()){
+ let y=d.getFullYear();
+ let m=String(d.getMonth()+1).padStart(2,"0");
+ let day=String(d.getDate()).padStart(2,"0");
+ return `${y}-${m}-${day}`;
+}
+
+function timeFormat(value){
+ if(!value)return "-";
+ return new Date(value).toLocaleTimeString("en-IN",{
+ hour:"2-digit",minute:"2-digit",second:"2-digit",
+ hour12:true
+ });
+}
+
+function message(msg){
+ document.getElementById("message").textContent=msg;
+}
+
+// STAFF REGISTRATION
 function addStaff(){
  let name=document.getElementById("staffName").value.trim();
+
  if(!name)return alert("Enter staff name");
+
  if(staff.some(s=>s.toLowerCase()===name.toLowerCase()))
- return alert("Staff already exists");
+ return alert("Staff already exists!");
+
  staff.push(name);
  save();
+
  document.getElementById("staffName").value="";
  update();
 }
 
+function selectedStaff(){
+ return document.getElementById("staffSelect").value;
+}
+
+function activeRecord(name){
+ return logs.find(x=>
+ x.name===name &&
+ x.date===localDate() &&
+ !x.out
+ );
+}
+
+// CHECK IN
 function checkIn(){
- let name=document.getElementById("staffSelect").value;
- if(!name)return alert("Select staff first");
+ let name=selectedStaff();
+ if(!name)return alert("Select staff member!");
 
- let date=now();
- let today=date.toLocaleDateString("en-CA");
- let active=logs.find(x=>x.name===name && x.date===today && !x.out);
-
- if(active)return alert("Already checked in!");
+ if(logs.some(x=>x.name===name && x.date===localDate()))
+ return alert("Attendance already recorded today!");
 
  logs.push({
  name:name,
- date:today,
- in:date.toISOString(),
+ date:localDate(),
+ in:now().toISOString(),
+ lunchStart:"",
+ lunchEnd:"",
  out:""
  });
+
  save();
  update();
- alert("Check In Recorded Successfully!");
+ message(name+" checked in successfully.");
 }
 
+// LUNCH START
+function breakStart(){
+ let name=selectedStaff();
+ if(!name)return alert("Select staff member!");
+
+ let x=activeRecord(name);
+
+ if(!x)return alert("Staff must check in first!");
+
+ if(x.lunchStart && !x.lunchEnd)
+ return alert("Lunch break is already running!");
+
+ if(x.lunchEnd)
+ return alert("Lunch break already completed!");
+
+ x.lunchStart=now().toISOString();
+
+ save();
+ update();
+ message(name+" started lunch break.");
+}
+
+// LUNCH END
+function breakEnd(){
+ let name=selectedStaff();
+ if(!name)return alert("Select staff member!");
+
+ let x=activeRecord(name);
+
+ if(!x || !x.lunchStart)
+ return alert("Start lunch break first!");
+
+ if(x.lunchEnd)
+ return alert("Lunch already completed!");
+
+ x.lunchEnd=now().toISOString();
+
+ save();
+ update();
+ message(name+" returned from lunch.");
+}
+
+// CHECK OUT
 function checkOut(){
- let name=document.getElementById("staffSelect").value;
- if(!name)return alert("Select staff first");
+ let name=selectedStaff();
+ if(!name)return alert("Select staff member!");
 
- let today=now().toLocaleDateString("en-CA");
- let active=logs.find(x=>x.name===name && x.date===today && !x.out);
+ let x=activeRecord(name);
 
- if(!active)return alert("No active Check In found!");
+ if(!x)return alert("No active check in found!");
 
- active.out=now().toISOString();
+ if(x.lunchStart && !x.lunchEnd)
+ return alert("Please end lunch break first!");
+
+ if(x.out)return alert("Already checked out!");
+
+ x.out=now().toISOString();
+
  save();
  update();
- alert("Check Out Recorded Successfully!");
+ message(name+" checked out successfully.");
 }
 
-function formatTime(value){
- return value ? new Date(value).toLocaleTimeString("en-IN",
- {hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "-";
+// LUNCH MINUTES
+function lunchMinutes(x){
+ if(!x.lunchStart)return 0;
+
+ let start=new Date(x.lunchStart);
+ let end=x.lunchEnd?new Date(x.lunchEnd):(x.out?new Date(x.out):now());
+
+ return Math.max(0,Math.floor((end-start)/60000));
 }
 
-function duration(x){
- if(!x.out)return "Working";
- let mins=Math.floor((new Date(x.out)-new Date(x.in))/60000);
- return Math.floor(mins/60)+"h "+mins%60+"m";
+// NET WORKING TIME
+function workingMinutes(x){
+ if(!x.in)return 0;
+
+ let start=new Date(x.in);
+ let end=x.out?new Date(x.out):now();
+
+ let total=Math.max(0,Math.floor((end-start)/60000));
+
+ return Math.max(0,total-lunchMinutes(x));
 }
 
+function formatDuration(minutes){
+ let h=Math.floor(minutes/60);
+ let m=minutes%60;
+ return h+"h "+m+"m";
+}
+
+// STATUS
+function getStatus(x){
+ if(x.out)return "Completed";
+ if(x.lunchStart && !x.lunchEnd)return "On Lunch";
+ return "Working";
+}
+
+// ATTENDANCE TABLE
 function render(){
  let filter=document.getElementById("filterDate").value;
+
  let list=logs.filter(x=>!filter||x.date===filter);
+
  document.getElementById("records").innerHTML=
  list.slice().reverse().map(x=>`
  <tr>
  <td>${escapeHTML(x.name)}</td>
  <td>${x.date}</td>
- <td>${formatTime(x.in)}</td>
- <td>${formatTime(x.out)}</td>
- <td>${duration(x)}</td>
- </tr>`).join("");
+ <td>${timeFormat(x.in)}</td>
+ <td>${timeFormat(x.lunchStart)}</td>
+ <td>${timeFormat(x.lunchEnd)}</td>
+ <td>${timeFormat(x.out)}</td>
+ <td>${formatDuration(lunchMinutes(x))}</td>
+ <td>${formatDuration(workingMinutes(x))}</td>
+ <td class="status">${getStatus(x)}</td>
+ </tr>
+ `).join("");
 }
 
 function escapeHTML(s){
- return s.replace(/[&<>"']/g,c=>({
+ return String(s).replace(/[&<>"']/g,c=>({
  "&":"&amp;","<":"&lt;",">":"&gt;",
  '"':"&quot;","'":"&#39;"
  }[c]));
 }
 
+// EXCEL EXPORT
 function exportExcel(){
- let rows=[["Staff Name","Date","Check In","Check Out","Working Hours"]];
+ let rows=[[
+ "Staff Name","Date","Check In",
+ "Lunch Start","Lunch End","Check Out",
+ "Lunch Duration","Net Working Hours","Status"
+ ]];
+
  logs.forEach(x=>{
  rows.push([
- x.name,x.date,formatTime(x.in),
- formatTime(x.out),duration(x)
+ x.name,x.date,
+ timeFormat(x.in),
+ timeFormat(x.lunchStart),
+ timeFormat(x.lunchEnd),
+ timeFormat(x.out),
+ formatDuration(lunchMinutes(x)),
+ formatDuration(workingMinutes(x)),
+ getStatus(x)
  ]);
  });
+
  let csv="\uFEFF"+rows.map(r=>
  r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")
  ).join("\r\n");
 
- let blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+ let blob=new Blob([csv],{
+ type:"text/csv;charset=utf-8;"
+ });
+
  let url=URL.createObjectURL(blob);
  let a=document.createElement("a");
+
  a.href=url;
- a.download="Staff_Attendance.csv";
+ a.download="Staff_Attendance_"+localDate()+".csv";
  a.click();
+
  URL.revokeObjectURL(url);
 }
 
+// CLEAR FILTER
+function clearFilter(){
+ document.getElementById("filterDate").value=localDate();
+ render();
+}
+
+// UPDATE DASHBOARD
 function update(){
  let select=document.getElementById("staffSelect");
  let current=select.value;
+
  select.innerHTML='<option value="">Select Staff Member</option>';
+
  staff.forEach(s=>{
  let option=document.createElement("option");
  option.value=s;
  option.textContent=s;
  select.appendChild(option);
  });
+
  select.value=current;
 
- let today=now().toLocaleDateString("en-CA");
+ let today=localDate();
+ let todays=logs.filter(x=>x.date===today);
+
  document.getElementById("totalStaff").textContent=staff.length;
+
  document.getElementById("presentToday").textContent=
- new Set(logs.filter(x=>x.date===today).map(x=>x.name)).size;
+ new Set(todays.map(x=>x.name)).size;
+
  document.getElementById("workingNow").textContent=
- logs.filter(x=>x.date===today&&!x.out).length;
+ todays.filter(x=>!x.out && !(x.lunchStart&&!x.lunchEnd)).length;
+
+ document.getElementById("onLunch").textContent=
+ todays.filter(x=>!x.out && x.lunchStart&&!x.lunchEnd).length;
+
+ document.getElementById("staffList").textContent=
+ "Registered Staff: "+staff.join(", ");
+
  render();
 }
 
+// LIVE CLOCK
 function clock(){
  document.getElementById("clock").textContent=
- "Current Time: "+now().toLocaleString("en-IN");
+ now().toLocaleString("en-IN");
 }
 
-document.getElementById("filterDate").value=
- now().toLocaleDateString("en-CA");
+document.getElementById("filterDate").value=localDate();
 
-setInterval(clock,1000);
+setInterval(()=>{
+ clock();
+ update();
+},1000);
+
 clock();
 update();
+
 </script>
 </body>
 </html>
