@@ -1,0 +1,270 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Attendance Management</title>
+<style>
+*{box-sizing:border-box}
+body{
+ font-family:Arial,sans-serif;
+ background:#f3f5f9;
+ margin:0;padding:20px;color:#202b3c
+}
+.container{max-width:1100px;margin:auto}
+header{
+ background:#142b4a;color:white;
+ padding:25px;border-radius:12px;
+ margin-bottom:20px
+}
+header h1{margin:0 0 8px}
+.card{
+ background:white;padding:20px;
+ border-radius:12px;margin-bottom:20px;
+ box-shadow:0 3px 12px #0000000c
+}
+input,select,button{
+ padding:12px;border-radius:7px;
+ border:1px solid #d5dbe5;
+ font-size:14px
+}
+button{cursor:pointer;border:0;font-weight:bold}
+.primary{background:#1769d2;color:white}
+.success{background:#16834a;color:white}
+.danger{background:#d83b3b;color:white}
+.export{background:#087b59;color:white}
+.controls{display:flex;gap:10px;flex-wrap:wrap}
+.controls input,.controls select{flex:1;min-width:150px}
+.stats{
+ display:grid;grid-template-columns:repeat(3,1fr);
+ gap:12px;margin-bottom:20px
+}
+.stat{
+ background:white;padding:18px;border-radius:10px
+}
+.stat h2{margin:8px 0;color:#1769d2}
+table{width:100%;border-collapse:collapse;min-width:750px}
+th,td{padding:13px;border-bottom:1px solid #eee;text-align:left}
+th{background:#edf2f8}
+.table-wrap{overflow-x:auto}
+@media(max-width:600px){
+ .stats{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+<h1>STAFF MANAGEMENT</h1>
+<p>Staff Attendance & Working Hours Tracker</p>
+<div id="clock"></div>
+</header>
+
+<div class="card">
+<h3>Add New Staff</h3>
+<div class="controls">
+<input id="staffName" placeholder="Enter Staff Name">
+<button class="primary" onclick="addStaff()">+ Add Staff</button>
+</div>
+</div>
+
+<div class="card">
+<h3>Attendance Entry</h3>
+<div class="controls">
+<select id="staffSelect">
+<option value="">Select Staff Member</option>
+</select>
+<button class="success" onclick="checkIn()">CHECK IN</button>
+<button class="danger" onclick="checkOut()">CHECK OUT</button>
+</div>
+<p id="message"></p>
+</div>
+
+<div class="stats">
+<div class="stat">
+Total Staff
+<h2 id="totalStaff">0</h2>
+</div>
+<div class="stat">
+Present Today
+<h2 id="presentToday">0</h2>
+</div>
+<div class="stat">
+Currently Working
+<h2 id="workingNow">0</h2>
+</div>
+</div>
+
+<div class="card">
+<h3>Attendance Records</h3>
+<div class="controls" style="margin-bottom:15px">
+<input type="date" id="filterDate" onchange="render()">
+<button class="export" onclick="exportExcel()">Download Excel</button>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Staff Name</th>
+<th>Date</th>
+<th>Check In</th>
+<th>Check Out</th>
+<th>Working Hours</th>
+</tr>
+</thead>
+<tbody id="records"></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<script>
+let staff=JSON.parse(localStorage.getItem("staff")||"[]");
+let logs=JSON.parse(localStorage.getItem("logs")||"[]");
+
+function save(){
+ localStorage.setItem("staff",JSON.stringify(staff));
+ localStorage.setItem("logs",JSON.stringify(logs));
+}
+
+function now(){
+ return new Date();
+}
+
+function addStaff(){
+ let name=document.getElementById("staffName").value.trim();
+ if(!name)return alert("Enter staff name");
+ if(staff.some(s=>s.toLowerCase()===name.toLowerCase()))
+ return alert("Staff already exists");
+ staff.push(name);
+ save();
+ document.getElementById("staffName").value="";
+ update();
+}
+
+function checkIn(){
+ let name=document.getElementById("staffSelect").value;
+ if(!name)return alert("Select staff first");
+
+ let date=now();
+ let today=date.toLocaleDateString("en-CA");
+ let active=logs.find(x=>x.name===name && x.date===today && !x.out);
+
+ if(active)return alert("Already checked in!");
+
+ logs.push({
+ name:name,
+ date:today,
+ in:date.toISOString(),
+ out:""
+ });
+ save();
+ update();
+ alert("Check In Recorded Successfully!");
+}
+
+function checkOut(){
+ let name=document.getElementById("staffSelect").value;
+ if(!name)return alert("Select staff first");
+
+ let today=now().toLocaleDateString("en-CA");
+ let active=logs.find(x=>x.name===name && x.date===today && !x.out);
+
+ if(!active)return alert("No active Check In found!");
+
+ active.out=now().toISOString();
+ save();
+ update();
+ alert("Check Out Recorded Successfully!");
+}
+
+function formatTime(value){
+ return value ? new Date(value).toLocaleTimeString("en-IN",
+ {hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "-";
+}
+
+function duration(x){
+ if(!x.out)return "Working";
+ let mins=Math.floor((new Date(x.out)-new Date(x.in))/60000);
+ return Math.floor(mins/60)+"h "+mins%60+"m";
+}
+
+function render(){
+ let filter=document.getElementById("filterDate").value;
+ let list=logs.filter(x=>!filter||x.date===filter);
+ document.getElementById("records").innerHTML=
+ list.slice().reverse().map(x=>`
+ <tr>
+ <td>${escapeHTML(x.name)}</td>
+ <td>${x.date}</td>
+ <td>${formatTime(x.in)}</td>
+ <td>${formatTime(x.out)}</td>
+ <td>${duration(x)}</td>
+ </tr>`).join("");
+}
+
+function escapeHTML(s){
+ return s.replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",
+ '"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+function exportExcel(){
+ let rows=[["Staff Name","Date","Check In","Check Out","Working Hours"]];
+ logs.forEach(x=>{
+ rows.push([
+ x.name,x.date,formatTime(x.in),
+ formatTime(x.out),duration(x)
+ ]);
+ });
+ let csv="\uFEFF"+rows.map(r=>
+ r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")
+ ).join("\r\n");
+
+ let blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+ let url=URL.createObjectURL(blob);
+ let a=document.createElement("a");
+ a.href=url;
+ a.download="Staff_Attendance.csv";
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+function update(){
+ let select=document.getElementById("staffSelect");
+ let current=select.value;
+ select.innerHTML='<option value="">Select Staff Member</option>';
+ staff.forEach(s=>{
+ let option=document.createElement("option");
+ option.value=s;
+ option.textContent=s;
+ select.appendChild(option);
+ });
+ select.value=current;
+
+ let today=now().toLocaleDateString("en-CA");
+ document.getElementById("totalStaff").textContent=staff.length;
+ document.getElementById("presentToday").textContent=
+ new Set(logs.filter(x=>x.date===today).map(x=>x.name)).size;
+ document.getElementById("workingNow").textContent=
+ logs.filter(x=>x.date===today&&!x.out).length;
+ render();
+}
+
+function clock(){
+ document.getElementById("clock").textContent=
+ "Current Time: "+now().toLocaleString("en-IN");
+}
+
+document.getElementById("filterDate").value=
+ now().toLocaleDateString("en-CA");
+
+setInterval(clock,1000);
+clock();
+update();
+</script>
+</body>
+</html>
